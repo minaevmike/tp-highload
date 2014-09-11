@@ -142,7 +142,22 @@ main.o: main.cc /usr/include/stdc-predef.h /usr/include/c++/4.8/memory \
  /usr/include/x86_64-linux-gnu/sys/stat.h \
  /usr/include/x86_64-linux-gnu/bits/stat.h /usr/include/fcntl.h \
  /usr/include/x86_64-linux-gnu/bits/fcntl.h \
- /usr/include/x86_64-linux-gnu/bits/fcntl-linux.h const.h
+ /usr/include/x86_64-linux-gnu/bits/fcntl-linux.h \
+ /usr/include/c++/4.8/thread /usr/include/c++/4.8/chrono \
+ /usr/include/c++/4.8/ratio /usr/include/c++/4.8/limits \
+ /usr/include/c++/4.8/ctime /usr/include/c++/4.8/vector \
+ /usr/include/c++/4.8/bits/stl_vector.h \
+ /usr/include/c++/4.8/bits/stl_bvector.h \
+ /usr/include/c++/4.8/bits/vector.tcc /usr/include/c++/4.8/mutex \
+ /usr/include/c++/4.8/system_error \
+ /usr/include/x86_64-linux-gnu/c++/4.8/bits/error_constants.h \
+ /usr/include/c++/4.8/map /usr/include/c++/4.8/bits/stl_tree.h \
+ /usr/include/c++/4.8/bits/stl_map.h \
+ /usr/include/c++/4.8/bits/stl_multimap.h /usr/include/c++/4.8/fstream \
+ /usr/include/c++/4.8/bits/codecvt.h \
+ /usr/include/x86_64-linux-gnu/c++/4.8/bits/basic_file.h \
+ /usr/include/x86_64-linux-gnu/c++/4.8/bits/c++io.h \
+ /usr/include/c++/4.8/bits/fstream.tcc const.h
 
 /usr/include/stdc-predef.h:
 
@@ -529,5 +544,47 @@ main.o: main.cc /usr/include/stdc-predef.h /usr/include/c++/4.8/memory \
 /usr/include/x86_64-linux-gnu/bits/fcntl.h:
 
 /usr/include/x86_64-linux-gnu/bits/fcntl-linux.h:
+
+/usr/include/c++/4.8/thread:
+
+/usr/include/c++/4.8/chrono:
+
+/usr/include/c++/4.8/ratio:
+
+/usr/include/c++/4.8/limits:
+
+/usr/include/c++/4.8/ctime:
+
+/usr/include/c++/4.8/vector:
+
+/usr/include/c++/4.8/bits/stl_vector.h:
+
+/usr/include/c++/4.8/bits/stl_bvector.h:
+
+/usr/include/c++/4.8/bits/vector.tcc:
+
+/usr/include/c++/4.8/mutex:
+
+/usr/include/c++/4.8/system_error:
+
+/usr/include/x86_64-linux-gnu/c++/4.8/bits/error_constants.h:
+
+/usr/include/c++/4.8/map:
+
+/usr/include/c++/4.8/bits/stl_tree.h:
+
+/usr/include/c++/4.8/bits/stl_map.h:
+
+/usr/include/c++/4.8/bits/stl_multimap.h:
+
+/usr/include/c++/4.8/fstream:
+
+/usr/include/c++/4.8/bits/codecvt.h:
+
+/usr/include/x86_64-linux-gnu/c++/4.8/bits/basic_file.h:
+
+/usr/include/x86_64-linux-gnu/c++/4.8/bits/c++io.h:
+
+/usr/include/c++/4.8/bits/fstream.tcc:
 
 const.h:

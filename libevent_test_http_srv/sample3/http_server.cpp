@@ -6,7 +6,7 @@
 
 #include <evhttp.h>
 #include <fcntl.h>
-
+#include <iostream>
 #ifdef _WIN32
   #include <io.h>
   #define open _open
@@ -282,6 +282,7 @@ namespace Network
     bool volatile DoneInitThread = false;
     std::exception_ptr Except;
     evutil_socket_t Socket = -1;
+	std::cout << maxBodySize << std::endl;
     auto ThreadFunc = [&] ()
     {
       try

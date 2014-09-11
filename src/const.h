@@ -24,4 +24,5 @@
 const std::string addr = "127.0.0.1";
 const int16_t port = 8000;
 const std::string documentRoot = "/home/mike/";
+const uint32_t srvThreads = 4;
 #endif
