@@ -11,7 +11,7 @@ int main()
   char const SrvAddress[] = "127.0.0.1";
   std::uint16_t SrvPort = 5555;
   std::uint16_t SrvThreadCount = 4;
-  std::string const RootDir = "../test_content";
+  std::string const RootDir = "/home/mike/";
   std::string const DefaultPage = "index.html";
   std::mutex Mtx;
   try

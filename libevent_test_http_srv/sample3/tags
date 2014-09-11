@@ -1,0 +1,122 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
+!_TAG_PROGRAM_NAME	Exuberant Ctags	//
+!_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
+!_TAG_PROGRAM_VERSION	5.9~svn20110310	//
+BoolFlagInvertor	tools.h	/^    BoolFlagInvertor(bool volatile *flag)$/;"	f	class:Common::final
+CPP	Makefile	/^CPP = $(wildcard *.cpp)$/;"	m
+CXX	Makefile	/^CXX = g++$/;"	m
+Common	non_copyable.h	/^namespace Common$/;"	n
+Common	static_counter.h	/^namespace Common$/;"	n
+Common	tools.h	/^namespace Common$/;"	n
+Content	http_content_type.h	/^    namespace Content$/;"	n	namespace:Network::Http
+DECLARE_EXCEPTION_EX	exceptions.h	6;"	d
+DECLARE_HTTP_CONTENT_TYPE	http_content_type.h	12;"	d
+DECLARE_RUNTIME_EXCEPTION	exceptions.h	30;"	d
+DECLARE_STRING_CONSTANT	string_constant.h	4;"	d
+DECLARE_TYPE_REGISTRY	type_registry.h	4;"	d
+FLAGS	Makefile	/^FLAGS = -Wall -std=c++11  -O3 -g0$/;"	m
+FileExtToType	http_content_type.h	/^          inline char const* FileExtToType(char const *ext)$/;"	f	namespace:Network::Http::Content::Type::Private
+FileExtToType	http_content_type.h	/^      inline char const* FileExtToType(char const *ext)$/;"	f	namespace:Network::Http::Content
+Find	http_content_type.h	/^            static char const* Find(char const *)$/;"	f	struct:Network::Http::Content::Type::Private::FindType
+Find	http_content_type.h	/^            static char const* Find(char const *ext)$/;"	f	struct:Network::Http::Content::Type::Private::FindType
+FindType	http_content_type.h	/^          struct FindType$/;"	s	namespace:Network::Http::Content::Type::Private
+FindType	http_content_type.h	/^          struct FindType<0>$/;"	s	namespace:Network::Http::Content::Type::Private
+Flag	tools.h	/^    bool volatile *Flag;$/;"	m	class:Common::final
+FreeBuf	http_server.cpp	/^      static void FreeBuf(void const *data, std::size_t datalen, void *extra)$/;"	f	class:Network::__anon2::final	file:
+Func	http_server.cpp	/^      HttpServer::OnRequestFunc Func;$/;"	m	struct:Network::__anon2::RequestParams	file:
+GET	http_request.h	/^      HEAD, GET, PUT, POST$/;"	m	class:Network::IHttpRequest::Type
+GET_NEXT_STATIC_COUNTER	static_counter.h	32;"	d
+GetContent	http_server.cpp	/^      virtual void GetContent(void *buf, std::size_t len, bool remove) const$/;"	f	class:Network::__anon2::final	file:
+GetContentSize	http_server.cpp	/^      virtual std::size_t GetContentSize() const$/;"	f	class:Network::__anon2::final	file:
+GetHeaderAttr	http_server.cpp	/^      virtual std::string const GetHeaderAttr(char const *attrName) const$/;"	f	class:Network::__anon2::final::std	file:
+GetInputHeaders	http_server.cpp	/^      void GetInputHeaders() const$/;"	f	class:Network::__anon2::final	file:
+GetOutputBuf	http_server.cpp	/^      void GetOutputBuf() const$/;"	f	class:Network::__anon2::final	file:
+GetOutputHeaders	http_server.cpp	/^      void GetOutputHeaders() const$/;"	f	class:Network::__anon2::final	file:
+GetParams	http_server.cpp	/^      virtual RequestParams const GetParams() const$/;"	f	class:Network::__anon2::final	file:
+GetPath	http_server.cpp	/^      virtual std::string const GetPath() const$/;"	f	class:Network::__anon2::final::std	file:
+GetRequestType	http_server.cpp	/^      virtual Type GetRequestType() const$/;"	f	class:Network::__anon2::final	file:
+GetResponseCode	http_server.cpp	/^      int GetResponseCode() const$/;"	f	class:Network::__anon2::final
+GetUri	http_server.cpp	/^      void GetUri() const$/;"	f	class:Network::__anon2::final	file:
+HEAD	http_request.h	/^      HEAD, GET, PUT, POST$/;"	m	class:Network::IHttpRequest::Type
+Header	http_headers.h	/^      namespace Header$/;"	n	namespace:Network::Http::Request
+Header	http_headers.h	/^      namespace Header$/;"	n	namespace:Network::Http::Response
+Hierarchy	static_counter.h	/^    struct Hierarchy$/;"	s	namespace:Common::Private
+Hierarchy	static_counter.h	/^    struct Hierarchy<0>$/;"	s	namespace:Common::Private
+Http	http_content_type.h	/^  namespace Http$/;"	n	namespace:Network
+Http	http_headers.h	/^  namespace Http$/;"	n	namespace:Network
+HttpRequest	http_server.cpp	/^      HttpRequest(evhttp_request *request)$/;"	f	class:Network::__anon2::final
+HttpRequestTypeToAllowedMethod	http_server.cpp	/^    int HttpRequestTypeToAllowedMethod(IHttpRequest::Type const &type)$/;"	f	namespace:Network::__anon2
+HttpServer	http_server.cpp	/^  HttpServer::HttpServer(std::string const &address, std::uint16_t port,$/;"	f	class:Network::HttpServer
+IHttpRequest	http_request.h	/^  struct IHttpRequest$/;"	s	namespace:Network
+IHttpRequestPtr	http_request.h	/^  typedef std::shared_ptr<IHttpRequest> IHttpRequestPtr;$/;"	t	namespace:Network
+INIT_STATIC_COUNTER	static_counter.h	25;"	d
+InputBuf	http_server.cpp	/^      evbuffer *InputBuf = nullptr;$/;"	m	class:Network::__anon2::final	file:
+InputHeaders	http_server.cpp	/^      evkeyvalq *InputHeaders = nullptr;$/;"	m	class:Network::__anon2::final	file:
+IsRun	http_server.h	/^    volatile bool IsRun = true;$/;"	m	class:Network::final
+LIBS	Makefile	/^LIBS = pthread event$/;"	m
+MaxBodySize	http_server.h	/^    enum { MaxHeaderSize = static_cast<std::size_t>(-1), MaxBodySize = MaxHeaderSize };$/;"	e	enum:Network::final::__anon1
+MaxHeaderSize	http_server.h	/^    enum { MaxHeaderSize = static_cast<std::size_t>(-1), MaxBodySize = MaxHeaderSize };$/;"	e	enum:Network::final::__anon1
+MethodPool	http_server.h	/^    typedef std::vector<IHttpRequest::Type> MethodPool;$/;"	t	class:Network::final
+Network	http_content_type.h	/^namespace Network$/;"	n
+Network	http_headers.h	/^namespace Network$/;"	n
+Network	http_request.h	/^namespace Network$/;"	n
+Network	http_server.cpp	/^namespace Network$/;"	n	file:
+Network	http_server.h	/^namespace Network$/;"	n
+NonCopyable	non_copyable.h	/^    NonCopyable()$/;"	f	class:Common::NonCopyable
+NonCopyable	non_copyable.h	/^  class NonCopyable$/;"	c	namespace:Common
+OBJ	Makefile	/^OBJ = $(CPP:.cpp=.o)$/;"	m
+OnRawRequest	http_server.cpp	/^    void OnRawRequest(evhttp_request *request, void *prm)$/;"	f	namespace:Network::__anon2
+OnRequestFunc	http_server.h	/^    typedef std::function<void (IHttpRequestPtr)> OnRequestFunc;$/;"	t	class:Network::final
+OutputBuf	http_server.cpp	/^      evbuffer *OutputBuf = nullptr;$/;"	m	class:Network::__anon2::final	file:
+OutputHeaders	http_server.cpp	/^      evkeyvalq *OutputHeaders = nullptr;$/;"	m	class:Network::__anon2::final	file:
+PROJECT	Makefile	/^PROJECT = sample3$/;"	m
+PUT	http_request.h	/^      HEAD, GET, PUT, POST$/;"	m	class:Network::IHttpRequest::Type
+Private	http_content_type.h	/^        namespace Private$/;"	n	namespace:Network::Http::Content::Type
+Private	static_counter.h	/^  namespace Private$/;"	n	namespace:Common
+Process	http_server.cpp	/^      bool volatile *Process = nullptr;$/;"	m	struct:Network::__anon2::RequestParams	file:
+REGISTRY_ADD_TYPE	type_registry.h	8;"	d
+Request	http_headers.h	/^    namespace Request$/;"	n	namespace:Network::Http
+Request	http_server.cpp	/^      evhttp_request *Request;$/;"	m	class:Network::__anon2::final	file:
+RequestParams	http_request.h	/^    typedef std::unordered_map<std::string, std::string> RequestParams;$/;"	t	struct:Network::IHttpRequest
+RequestParams	http_server.cpp	/^    struct RequestParams$/;"	s	namespace:Network::__anon2	file:
+Response	http_headers.h	/^    namespace Response$/;"	n	namespace:Network::Http
+ResponseCode	http_server.cpp	/^      int ResponseCode = HTTP_OK;$/;"	m	class:Network::__anon2::final	file:
+RunFlag	http_server.h	/^    Common::BoolFlagInvertor RunFlag;$/;"	m	class:Network::final
+SetResponseAttr	http_server.cpp	/^      virtual void SetResponseAttr(std::string const &name, std::string const &val)$/;"	f	class:Network::__anon2::final	file:
+SetResponseBuf	http_server.cpp	/^      virtual void SetResponseBuf(void const *data, std::size_t bytes)$/;"	f	class:Network::__anon2::final	file:
+SetResponseCode	http_server.cpp	/^      virtual void SetResponseCode(int code)$/;"	f	class:Network::__anon2::final	file:
+SetResponseFile	http_server.cpp	/^      virtual void SetResponseFile(std::string const &fileName)$/;"	f	class:Network::__anon2::final	file:
+SetResponseString	http_server.cpp	/^      virtual void SetResponseString(std::string const &str)$/;"	f	class:Network::__anon2::final	file:
+ThreadDeleter	http_server.h	/^    void (*ThreadDeleter)(std::thread *t) = [] (std::thread *t) { t->join(); delete t; };;$/;"	m	class:Network::final
+ThreadPool	http_server.h	/^    typedef std::vector<ThreadPtr> ThreadPool;$/;"	t	class:Network::final
+ThreadPtr	http_server.h	/^    typedef std::unique_ptr<std::thread, decltype(ThreadDeleter)> ThreadPtr;$/;"	t	class:Network::final
+Threads	http_server.h	/^    ThreadPool Threads;$/;"	m	class:Network::final
+Type	http_content_type.h	/^      namespace Type$/;"	n	namespace:Network::Http::Content
+Type	http_request.h	/^    enum class Type$/;"	c	struct:Network::IHttpRequest
+TypeFromFileName	http_content_type.h	/^      inline char const* TypeFromFileName(std::string const &fileName)$/;"	f	namespace:Network::Http::Content
+Uri	http_server.cpp	/^      evhttp_uri const *Uri = nullptr;$/;"	m	class:Network::__anon2::final	file:
+__COMMON_EXCEPTIONS_H__	exceptions.h	2;"	d
+__COMMON_NON_COPYABLE_H__	non_copyable.h	2;"	d
+__COMMON_STATIC_COUNTER_H__	static_counter.h	2;"	d
+__COMMON_TOOLS_H__	tools.h	2;"	d
+__COMMON_TYPE_REGISTRY_H__	type_registry.h	2;"	d
+__NETWORK_HTTP_CONTENT_TYPE_H__	http_content_type.h	2;"	d
+__NETWORK_HTTP_HEADERS_H__	http_headers.h	2;"	d
+__NETWORK_HTTP_REQUEST_H__	http_request.h	2;"	d
+__NETWORK_HTTP_SERVER_H__	http_server.h	2;"	d
+__NETWORK_STRING_CONSTANT_H__	string_constant.h	2;"	d
+close	http_server.cpp	14;"	d	file:
+close	http_server.cpp	19;"	d	file:
+final	http_server.cpp	/^    class HttpRequest final$/;"	c	namespace:Network::__anon2	file:
+final	http_server.h	/^  class HttpServer final$/;"	c	namespace:Network
+final	tools.h	/^  class BoolFlagInvertor final$/;"	c	namespace:Common
+lseek	http_server.cpp	13;"	d	file:
+lseek	http_server.cpp	18;"	d	file:
+main	main.cpp	/^int main()$/;"	f
+open	http_server.cpp	12;"	d	file:
+open	http_server.cpp	17;"	d	file:
+~BoolFlagInvertor	tools.h	/^    ~BoolFlagInvertor()$/;"	f	class:Common::final
+~IHttpRequest	http_request.h	/^    virtual ~IHttpRequest() {}$/;"	f	struct:Network::IHttpRequest
+~NonCopyable	non_copyable.h	/^    ~NonCopyable()$/;"	f	class:Common::NonCopyable
