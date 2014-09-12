@@ -38,8 +38,8 @@ const evhttp_uri* getUri(evhttp_request *req);
 void requestThread();
 std::string getPath(evhttp_request *req);
 void onReq(evhttp_request *req, void*);
-std::mutex m;
-std::map<std::string, std::string> cache;
+std::mutex m, tm;
+std::map <std::thread::id, int> threadId;
 std::exception_ptr initExcept;
 bool volatile isRun = true;
 evutil_socket_t soc = -1;
@@ -51,43 +51,21 @@ void setAttr(evkeyvalq *outHeader, std::string key, std::string value) {
 void setResponseFile(evbuffer *buf, std::string const &fileName) {           
 	auto FileDeleter = [] (int *f) { if (*f != -1) close(*f); delete f; };
 	std::lock_guard<std::mutex> lock(m);
-	/*auto it = cache.find(fileName);
-	if(it != cache.end()) {
-		std::cout << "Cached!" << std::endl;
-		evbuffer_add_printf(buf, it->second.c_str());
+	std::unique_ptr<int, decltype(FileDeleter)> file(new int(open(fileName.c_str(), 0)), FileDeleter);
+	if (*file == -1) {
+		std::cout << "Could not find content for uri: " << fileName << std::endl;
+		return;
 	}
-	else {*/
-	std::unique_ptr<int, decltype(FileDeleter)> File(new int(open(fileName.c_str(), 0)), FileDeleter);
-
-		/*std::ifstream t(fileName, std::ifstream::in);
-		if(!t) {
-			std::cout << "Could not find content for uri: " << fileName << std::endl;
-			return;
-}
-t.seekg(0, std::ios::end);
-size_t size = t.tellg();
-std::string buffer(size, ' ');
-t.seekg(0);
-t.read(&buffer[0], size);
-cache[fileName] = buffer;
-std::cout << buffer << std::endl;
-t.close();
-evbuffer_add_printf(buf, buffer.c_str());*/
-		if (*File == -1) {
-			std::cout << "Could not find content for uri: " << fileName << std::endl;
-			return;
-		}
-	ev_off_t Length = lseek(*File, 0, SEEK_END);
-	if (Length == -1 || lseek(*File, 0, SEEK_SET) == -1) {
+	ev_off_t Length = lseek(*file, 0, SEEK_END);
+	if (Length == -1 || lseek(*file, 0, SEEK_SET) == -1) {
 		std::cout << "Failed to calc file size " << std::endl;
 		return;
 	}
-	if (evbuffer_add_file(buf, *File, 0, Length) == -1) {
+	if (evbuffer_add_file(buf, *file, 0, Length) == -1) {
 		std::cout << "Failed to make response." << std::endl;
 		return;
 	}
-	*File.get() = -1;
-	//}
+	*file.get() = -1;
 }
 
 const evhttp_uri* getUri(evhttp_request *req){
@@ -129,12 +107,20 @@ void requestThread(){
 }
 
 std::string getPath(evhttp_request *req){
-	std::cout << "URI: " << getUri(req) << std::endl;
+	//std::cout << "URI: " << getUri(req) << std::endl;
 	const char *path = evhttp_uri_get_path(getUri(req));
 	return path==NULL ? std::string("") : std::string(path);
 }
 
 void onReq(evhttp_request *req, void*) {
+	tm.lock();
+	auto it = threadId.find(std::this_thread::get_id());
+	if(it == threadId.end())
+		threadId[std::this_thread::get_id()] = 0;
+	else 
+		threadId[std::this_thread::get_id()]++;
+	//std::cout << std::this_thread::get_id() << std::endl;
+	tm.unlock();
 	auto *outBuf = evhttp_request_get_output_buffer(req);
 	evbuffer_set_flags(outBuf, EVBUFFER_FLAG_DRAINS_TO_FD);
 	if (!outBuf)
@@ -147,6 +133,7 @@ void onReq(evhttp_request *req, void*) {
 }
 int main()
 {
+	std::ios::sync_with_stdio(false);
 	try {
 		auto threadDeleter = [&] (std::thread *t) { isRun = false; t->join(); delete t; };
 		typedef std::unique_ptr<std::thread, decltype(threadDeleter)> threadPtr;
@@ -164,6 +151,9 @@ int main()
 			threads.push_back(std::move(t));
 		}
 		std::cin.get();
+		for(auto it = threadId.begin(); it != threadId.end(); it++){
+			std::cout << it->first << " " << it->second << std::endl;
+		}
 		isRun = false;
 	} catch (std::exception const &e)
 	{
