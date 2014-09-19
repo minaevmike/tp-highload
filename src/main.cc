@@ -16,7 +16,7 @@
  * You should have received a copy of the GNU General Public License along
  * with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-
+//#include <boost/lockfree/queue.hpp>
 #include <memory>
 #include <cstdint>
 #include <iostream>
@@ -48,6 +48,7 @@
 #include <event2/util.h>
 #include <event2/event.h>
 #include <signal.h>
+#include <queue>
 
 #define SERVER_PORT 5555
 
@@ -68,24 +69,42 @@ void setAttr(evkeyvalq *outHeader, std::string key, std::string value) {
     evhttp_add_header(outHeader, key.c_str(), value.c_str());
 }
 
-typedef struct client {
-    /* The client's socket. */
-    int fd;
+/*
+class client_t {
+    public:
+        int fd;
+        struct event_base *evbase;
+        struct bufferevent *buf_ev;
+        struct evbuffer *output_buffer;
+        client_t() {};
+        client_t(const client_t& other) {
+            fd = other.fd;
+            buf_ev = other.buf_ev;
+            evbase = other.evbase;
+            output_buffer = other.output_buffer;
+        }
+        ~client_t(){}
+        client_t &operator=(const client_t& other) {
+            if(this == &other) return *this;
+            fd = other.fd;
+            buf_ev = other.buf_ev;
+            evbase = other.evbase;
+            output_buffer = other.output_buffer;
+            return *this;
+        }
 
-    /* The event_base for this client. */
-    struct event_base *evbase;
+};
+*/
+//boost::lockfree::queue<client_t*> queue;
 
-    /* The bufferedevent for this client. */
-    struct bufferevent *buf_ev;
-
-    /* The output buffer for this client. */
-    struct evbuffer *output_buffer;
-
-    /* Here you can add your own application-specific
-     * attributes which
-     *      * are connection-specific. */
+typedef struct client{
+        int fd;
+        struct event_base *evbase;
+        struct bufferevent *buf_ev;
+        struct evbuffer *output_buffer;
 } client_t;
 
+std::queue<client_t*> q;
 void setResponseFile(evbuffer *buf, std::string const &fileName) {           
 	auto FileDeleter = [] (int *f) { if (*f != -1) close(*f); delete f; };
 	std::lock_guard<std::mutex> lock(m);
@@ -170,11 +189,30 @@ void onReq(evhttp_request *req, void*) {
     //evbuffer_add_printf(OutBuf, "<html><body><center><h1>Hello Wotld!</h1></center></body></html>");
     evhttp_send_reply(req, HTTP_OK, "", outBuf);
 }
+static void closeClient(client_t *client) {
+    if (client != NULL) {
+        if (client->fd >= 0) {
+            close(client->fd);
+            client->fd = -1;
+        }
+    }
+}
 void buffered_on_read(struct bufferevent *bef, void*arg) {
     printf("On read\n");
+    client_t *cl = (client_t*) arg;
+    struct evbuffer *in = bufferevent_get_input(bef);
+    evbuffer_add_printf(cl->output_buffer, "HTTP/1.1 200 OK\n\r");
+    //bufferevent_enable(bef, EV_WRITE);
+    if (bufferevent_write_buffer(bef, cl->output_buffer)) {
+        printf("Error sending data to client on fd %d\n", cl->fd);
+        closeClient(cl);
+    }
 }
 void buffered_on_write(struct bufferevent *bev, void *arg) {
     printf("On write\n");
+    printf("exiting\n");
+    client_t *cl =(client_t*) arg;
+    event_base_loopbreak(cl->evbase);
 }
 void on_accept(evutil_socket_t fd, short ev, void *arg) {
     int client_fd;
@@ -205,16 +243,6 @@ void on_accept(evutil_socket_t fd, short ev, void *arg) {
     memset(client, 0, sizeof(*client));
     client->fd = client_fd;
 
-    /* Add any custom code
-     * anywhere from here to
-     * the end of this function
-     *      * to initialize
-     *      your
-     *      application-specific
-     *      attributes in the
-     *      client struct.
-     *           */
-
     if ((client->output_buffer = evbuffer_new()) == NULL) {
         printf("client output buffer allocation failed\n");
         return;
@@ -231,13 +259,38 @@ void on_accept(evutil_socket_t fd, short ev, void *arg) {
     }
     bufferevent_setcb(client->buf_ev, buffered_on_read, buffered_on_write, NULL, client);
     bufferevent_enable(client->buf_ev, EV_READ);
-    event_base_dispatch(client->evbase);
+    m.lock();
+    q.push(client);
+    m.unlock();
+    //event_base_dispatch(client->evbase);
 
 }
 static void sighandler(int signal) {
     fprintf(stdout, "Received signal %d: %s.  Shutting down.\n", signal,
             strsignal(signal));
     exit(1);
+}
+
+void threadF(){
+    std::cout << "Thread started\n" << std::endl;
+    client_t *client;
+    bool fl = false;
+    while(1) {
+        m.lock();
+        if(!q.empty()) {
+            client = q.front();
+            q.pop();
+            fl = true;
+        }
+        m.unlock();
+        if(fl) {
+            std::cout << "Poped element in " << std::this_thread::get_id() <<  std::endl;
+            event_base_dispatch(client->evbase);
+            printf("Exiting in loop\n");
+        }
+        fl = false;
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
 }
 int main()
 {
@@ -246,7 +299,6 @@ int main()
     struct event *ev_accept;
     int reuseaddr_on;
 
-    /* Set signal handlers */
     sigset_t sigset;
     sigemptyset(&sigset);
     struct sigaction siginfo;
@@ -276,23 +328,6 @@ int main()
     reuseaddr_on = 1;
     setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &reuseaddr_on,
             sizeof(reuseaddr_on));
-
-    /* Set
-     * the
-     * socket
-     * to
-     * non-blocking,
-     * this
-     * is
-     * essential
-     * in
-     * event
-     *      *
-     *      based
-     *      programming
-     *      with
-     *      libevent.
-     *      */
     if (evutil_make_socket_nonblocking(listenfd) < 0) {
         err(1, "failed to set server socket to non-blocking");
     }
@@ -304,12 +339,15 @@ int main()
     }
     ev_accept = event_new(evbase_accept, listenfd, EV_READ|EV_PERSIST, on_accept, NULL);
     event_add(ev_accept, NULL);
+    for(int i = 0;i < 4; i++) {
+        std::thread (threadF).detach();
+    }
     event_base_dispatch(evbase_accept);
 
     event_base_free(evbase_accept);
     evbase_accept = NULL;
 
     close(listenfd);
-
+    
     printf("Server shutdown.\n");
 }

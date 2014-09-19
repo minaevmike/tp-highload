@@ -1,5 +1,5 @@
 CFLAGS=-Wall -g -std=c++11
-LDFLAGS=-levent -lpthread -std=c++11
+LDFLAGS=-levent -lpthread -std=c++11 -lboost_atomic  -lboost_thread -lboost_system
 BINS=http
 CC=g++
 FILE=main.cc
