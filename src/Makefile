@@ -1,8 +1,8 @@
 CFLAGS=-Wall -g -O3
-LDFLAGS=-levent -lbsd 
+LDFLAGS=-levent -lbsd -lboost_system -std=c++11 -g -levent_pthreads -lpthread
 BINS=http
 CC=g++
-FILE=test.cc httpserver.cc 
+FILE=test.cc httpserver.cc threadpool.cpp 
 all: ${BINS}
 
 http: clean

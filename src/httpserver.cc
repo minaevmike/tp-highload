@@ -63,7 +63,6 @@ void urlDecode(char *src)
         }
     }
     *dst++ = '\0';
-    printf("%s\n", d);
     strcpy(s, d);
 }
 
@@ -223,7 +222,6 @@ void writeData(struct bufferevent *bev) {
             printf("HEAD\n");
             break;
     }*/
-    printf("path: %s\n", path);
     char fullPath[2048] = {'\0'};
     strcpy(fullPath, ROOT_PATH);
     strcat(fullPath, path);
@@ -235,20 +233,17 @@ void writeData(struct bufferevent *bev) {
                 httpHeader.status = NOT_FOUND;
             else
                 httpHeader.status = FORBIDDEN;
-            printf("Can't open %s", fullPath);
         } else {
             struct stat st;
             httpHeader.length = lseek(fd, 0, SEEK_END);
             if (httpHeader.length == -1 || lseek(fd, 0, SEEK_SET) == -1) {
                 httpHeader.status = BAD_REQUEST;
-                printf("Cant seek\n");
             }
             if (fstat(fd, &st) < 0) {
                 perror("fstat");
             }
         }
     }
-    printf("Path: %s\nLength: %lu\nfd: %d\n", fullPath, httpHeader.length, fd);
     addHeader(&httpHeader, output);
     if (fd != -1 && httpHeader.status == OK && httpHeader.command == GET) {
         evbuffer_set_flags(output, EVBUFFER_FLAG_DRAINS_TO_FD);
