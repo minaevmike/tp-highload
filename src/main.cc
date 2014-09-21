@@ -16,11 +16,10 @@
  * You should have received a copy of the GNU General Public License along
  * with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-//#include <boost/lockfree/queue.hpp>
+#include <boost/lockfree/queue.hpp>
 #include <memory>
 #include <cstdint>
 #include <iostream>
-#include <evhttp.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -50,169 +49,376 @@
 #include <signal.h>
 #include <queue>
 
+#define ROOT_PATH "/home/mike/"
 #define SERVER_PORT 5555
+#define MAX_PATH_SIZE 1024
 
-void setAttr(evkeyvalq *outHeader, std::string key, std::string value);
-void setResponseFile(evbuffer *buf, std::string const &fileName);
-const evhttp_uri* getUri(evhttp_request *req);
-void requestThread();
-std::string getPath(evhttp_request *req);
-void onReq(evhttp_request *req, void*);
+typedef enum {
+    GET,
+    HEAD,
+    UNKNOWN_C
+} command_t;
+
+typedef enum {
+    OK,
+    NOT_FOUND,
+    BAD_REQUEST
+} status_t;
+
+typedef enum {
+    HTML,
+    JPEG,
+    JPG,
+    PNG,
+    CSS,
+    JS,
+    GIF,
+    SWF,
+    UNKNOWN_T
+} contentType_t;
+
+typedef struct httpHeader {
+    command_t command;
+    status_t status;
+    long length;
+    contentType_t type;
+} httpHeader_t;
 std::mutex m, tm;
 std::map <std::thread::id, int> threadId;
 std::exception_ptr initExcept;
 bool volatile isRun = true;
 evutil_socket_t soc = -1;
-static struct event_base *evbase_accept;
+struct client_t {
+    int fd;
+    int openedFd;
+    struct event_base *evbase;
+    struct bufferevent *buf_ev;
+    struct evbuffer *output_buffer;
+    ~client_t(){
+#ifdef DEBUG
+        std::cout << "Close" << std::endl;
+#endif
+        if (fd >= 0) {
+            close(fd);
+            fd = -1;
+        }
+        if (openedFd >= 0) {
+            close(openedFd);
+            openedFd = -1;
+        }
+        if (buf_ev != NULL) {
+            bufferevent_free(buf_ev);
+            buf_ev = NULL;
+        }
+        if (evbase != NULL) {
+            event_base_free(evbase);
+            evbase = NULL;
+        }
+        if (output_buffer != NULL) {
+            evbuffer_free(output_buffer);
+            output_buffer = NULL;
+        }
+    }
+    client_t() {
+        fd = -1;
+        openedFd = -1;
+    }
+    client_t(const client_t&cl) {
+        fd = cl.fd;
+        openedFd = cl.openedFd;
+        evbase = cl.evbase;
+        buf_ev = cl.buf_ev;
+        output_buffer = cl.output_buffer;
+    }
+    client_t &operator=(const client_t &other) {
+        if(this != &other) {
+            fd = other.fd;
+            openedFd = other.openedFd;
+            evbase = other.evbase;
+            buf_ev = other.buf_ev;
+            output_buffer = other.output_buffer;
+        }
+        return *this;
+    }
+};
 
-void setAttr(evkeyvalq *outHeader, std::string key, std::string value) {
-    evhttp_add_header(outHeader, key.c_str(), value.c_str());
+contentType_t getContentType(char* path) {
+    contentType_t type;
+    char buf[256] = {'\0'};
+    char *pch = strrchr(path, '.');
+    if (pch != NULL) {
+        memcpy(buf, pch + 1, strlen(path) - (pch - path) - 1);
+        if (!strcmp(buf, "html"))
+            type = HTML;
+        else if (!strcmp(buf, "png"))
+            type = PNG;
+        else if (!strcmp(buf, "jpg"))
+            type = JPG;
+        else if (!strcmp(buf, "jpeg"))
+            type = JPEG;
+        else if (!strcmp(buf, "css"))
+            type = CSS;
+        else if (!strcmp(buf, "js"))
+            type = JS;
+        else if (!strcmp(buf, "gif"))
+            type = GIF;
+        else if (!strcmp(buf, "swf"))
+            type = SWF;
+        else 
+            type = UNKNOWN_T;
+    }
+    else {
+        type = UNKNOWN_T;
+    }
+    return type;
 }
 
-/*
-class client_t {
+void urlDecode(char *str) {
+    char tmp[MAX_PATH_SIZE] = {0};
+    char *pch = strrchr(str, '?');
+    unsigned int i;
+    if (pch != NULL)
+        str[pch - str] = '\0';
+    pch = tmp;
+    for(i = 0; i < strlen(str); i++) {
+        if (str[i] != '%') {
+            *pch++ = str[i];
+            continue;
+        }
+        if (!isdigit(str[i+1]) || !isdigit(str[i+2])){
+            *pch++ = str[i];
+            continue;
+        }
+        *pch++ = ((str[i+1] - '0') << 4) | (str[i+2] - '0');
+        i+=2;
+    }
+    *pch = '\0';
+    strcpy(str, tmp);
+}
+
+
+int getDepth(char *path) {
+    int depth = 0;
+    char *ch = strtok(path, "/");
+    while(ch != NULL) {
+        if(!strcmp(ch, ".."))
+            --depth;
+        else
+            ++depth;
+        if(depth < 0)
+            return -1;
+        ch = strtok(NULL, "/");
+    }
+    return depth;
+}
+void addHeader(httpHeader_t *h, struct evbuffer *buf) {
+    if(h->status == OK) {
+        //print response
+        evbuffer_add_printf(buf, "HTTP/1.1 200 OK\n");
+        char timeStr[64] = {'\0'};
+        time_t now = time(NULL);
+        strftime(timeStr, 64, "%Y-%m-%d %H:%M:%S", localtime(&now));
+        evbuffer_add_printf(buf, "Date: %s\n", timeStr);
+            evbuffer_add_printf(buf, "Server: BESTEUSERVER\n");
+            evbuffer_add_printf(buf, "Content-Type: ");
+        switch(h->type)
+        {
+            case HTML:
+                evbuffer_add_printf(buf, "text/html");
+            break;
+            case JPEG:
+            case JPG:
+                evbuffer_add_printf(buf, "image/jpeg");
+            break;
+            case PNG:
+                evbuffer_add_printf(buf, "image/png");
+            break;
+            case CSS:
+                evbuffer_add_printf(buf, "text/css");
+            break;
+            case JS:
+                evbuffer_add_printf(buf, "application/x-javascript");
+            break;
+            case GIF:
+                evbuffer_add_printf(buf, "image/gif");
+            break;
+            case SWF:
+                evbuffer_add_printf(buf, "application/x-shockwave-flash");
+            break;
+            default:
+            evbuffer_add_printf(buf, "text/html");
+        }
+        evbuffer_add_printf(buf, "\n");
+        evbuffer_add_printf(buf, "Content-Length: %lu\n", h->length);
+        evbuffer_add_printf(buf,"Connection: close\n\n");
+    }
+}
+static struct event_base *evbase_accept;
+/*typedef struct client{
+        int fd;
+        int openedFd;
+        struct event_base *evbase;
+        struct bufferevent *buf_ev;
+        struct evbuffer *output_buffer;
+} client_t;*/
+/*class client {
     public:
         int fd;
+        int openedFd;
         struct event_base *evbase;
         struct bufferevent *buf_ev;
         struct evbuffer *output_buffer;
-        client_t() {};
-        client_t(const client_t& other) {
-            fd = other.fd;
-            buf_ev = other.buf_ev;
-            evbase = other.evbase;
-            output_buffer = other.output_buffer;
-        }
-        ~client_t(){}
-        client_t &operator=(const client_t& other) {
-            if(this == &other) return *this;
-            fd = other.fd;
-            buf_ev = other.buf_ev;
-            evbase = other.evbase;
-            output_buffer = other.output_buffer;
-            return *this;
-        }
+        ~client();
+        client(const client& cl) {
+            fd = cl.fd;
+            openedFd = cl.openedFd;
+            evbase = cl.evbase;
+            buf_ev = 
 
-};
-*/
-//boost::lockfree::queue<client_t*> queue;
+};*/
 
-typedef struct client{
-        int fd;
-        struct event_base *evbase;
-        struct bufferevent *buf_ev;
-        struct evbuffer *output_buffer;
-} client_t;
+//std::queue<client_t*> q;
+boost::lockfree::queue<client_t*> lq(128);
 
-std::queue<client_t*> q;
-void setResponseFile(evbuffer *buf, std::string const &fileName) {           
-	auto FileDeleter = [] (int *f) { if (*f != -1) close(*f); delete f; };
-	std::lock_guard<std::mutex> lock(m);
-	std::unique_ptr<int, decltype(FileDeleter)> file(new int(open(fileName.c_str(), 0)), FileDeleter);
-	if (*file == -1) {
-		std::cout << "Could not find content for uri: " << fileName << std::endl;
-		return;
-	}
-	ev_off_t Length = lseek(*file, 0, SEEK_END);
-	if (Length == -1 || lseek(*file, 0, SEEK_SET) == -1) {
-		std::cout << "Failed to calc file size " << std::endl;
-		return;
-	}
-	if (evbuffer_add_file(buf, *file, 0, Length) == -1) {
-		std::cout << "Failed to make response." << std::endl;
-		return;
-	}
-	*file.get() = -1;
-}
-
-const evhttp_uri* getUri(evhttp_request *req){
-	return evhttp_request_get_evhttp_uri(req);
-}
-void requestThread(){
-	try
-	{
-		std::unique_ptr<event_base, decltype(&event_base_free)> eventBase(event_base_new(), &event_base_free);
-		if (!eventBase)
-			throw std::runtime_error("Failed to create new base_event.");
-        struct event *ev_accept;
-		/*std::unique_ptr<evhttp, decltype(&evhttp_free)> evHttp(evhttp_new(eventBase.get()), &evhttp_free);
-		if (!evHttp)
-			throw std::runtime_error("Failed to create new evhttp.");
-		evhttp_set_gencb(evHttp.get(), onReq, nullptr);
-		if (soc == -1)
-		{
-			auto *boundSock = evhttp_bind_socket_with_handle(evHttp.get(), addr.c_str(), port);
-			if (!boundSock)
-				throw std::runtime_error("Failed to bind server socket.");
-			if ((soc = evhttp_bound_socket_get_fd(boundSock)) == -1)
-				throw std::runtime_error("Failed to get server socket for next instance.");
-		}
-		else
-		{
-			if (evhttp_accept_socket(evHttp.get(), soc) == -1)
-				throw std::runtime_error("Failed to bind server socket for new instance.");
-		}*/
-		for ( ; isRun ; )
-		{
-			event_base_loop(eventBase.get(), EVLOOP_NONBLOCK);
-			std::this_thread::sleep_for(std::chrono::milliseconds(10));
-		}
-	}
-	catch (...)
-	{
-		initExcept = std::current_exception();
-	}
-}
-
-std::string getPath(evhttp_request *req){
-	//std::cout << "URI: " << getUri(req) << std::endl;
-	const char *path = evhttp_uri_get_path(getUri(req));
-	return path==NULL ? std::string("") : std::string(path);
-}
-
-void onReq(evhttp_request *req, void*) {
-	tm.lock();
-	auto it = threadId.find(std::this_thread::get_id());
-	if(it == threadId.end())
-		threadId[std::this_thread::get_id()] = 0;
-	else 
-		threadId[std::this_thread::get_id()]++;
-	//std::cout << std::this_thread::get_id() << std::endl;
-    tm.unlock();
-    auto *outBuf = evhttp_request_get_output_buffer(req);
-    evbuffer_set_flags(outBuf, EVBUFFER_FLAG_DRAINS_TO_FD);
-    if (!outBuf)
-        return;
-    auto *outHeader = evhttp_request_get_output_headers(req);
-    setAttr(outHeader, std::string("Content-Type"), std::string("text/html"));
-    setResponseFile(outBuf, documentRoot + getPath(req));
-    //evbuffer_add_printf(OutBuf, "<html><body><center><h1>Hello Wotld!</h1></center></body></html>");
-    evhttp_send_reply(req, HTTP_OK, "", outBuf);
-}
-static void closeClient(client_t *client) {
+static void closeAll(client_t *client) {
+#ifdef DEBUG
+    std::cout << "Close" << std::endl;
+#endif
     if (client != NULL) {
         if (client->fd >= 0) {
             close(client->fd);
             client->fd = -1;
         }
+        if (client->openedFd >= 0) {
+            close(client->openedFd);
+            client->openedFd = -1;
+        }
+        if (client->buf_ev != NULL) {
+            bufferevent_free(client->buf_ev);
+            client->buf_ev = NULL;
+        }
+        if (client->evbase != NULL) {
+            event_base_free(client->evbase);
+            client->evbase = NULL;
+        }
+        if (client->output_buffer != NULL) {
+            evbuffer_free(client->output_buffer);
+            client->output_buffer = NULL;
+        }
+        free(client);
     }
 }
-void buffered_on_read(struct bufferevent *bef, void*arg) {
+
+void buffered_on_read(struct bufferevent *bev, void*arg) {
+#ifdef DEBUG
     printf("On read\n");
-    client_t *cl = (client_t*) arg;
-    struct evbuffer *in = bufferevent_get_input(bef);
-    evbuffer_add_printf(cl->output_buffer, "HTTP/1.1 200 OK\n\r");
-    //bufferevent_enable(bef, EV_WRITE);
-    if (bufferevent_write_buffer(bef, cl->output_buffer)) {
-        printf("Error sending data to client on fd %d\n", cl->fd);
-        closeClient(cl);
+#endif
+    client_t *client = (client_t*) arg;
+    char *line;
+    size_t n;
+    struct evbuffer *input =  bufferevent_get_input(bev);
+    line = evbuffer_readln(input, &n, EVBUFFER_EOL_CRLF);
+    char cmd[256], protocol[256], path[MAX_PATH_SIZE];
+    httpHeader_t httpHeader;
+    httpHeader.command = UNKNOWN_C;
+    httpHeader.status = OK;
+    if (n != 0) {
+        int scaned = sscanf(line, "%s %s %s\n", cmd, path, protocol);
+        if (scaned == 3) {
+            if (!strcmp(cmd, "GET")) {
+                httpHeader.command = GET;
+            }
+            else if (!strcmp(cmd, "HEAD")) {
+                httpHeader.command = HEAD;
+            }
+            else { 
+                httpHeader.command = UNKNOWN_C;
+            }
+            if (path[0] != '/') {
+                printf("BAD INPUtT\n");
+                httpHeader.status = BAD_REQUEST;
+            }
+            urlDecode(path);
+            httpHeader.type = getContentType(path);
+            if (getDepth(path) == -1) {
+                printf("BAD DEPTH\n");
+                httpHeader.status = BAD_REQUEST;
+            }
+        }
+        else {
+            printf("Bad scanned\n");
+            httpHeader.status = BAD_REQUEST;
+        }
+    }
+    else {
+        printf("OOO BAD N\n");
+        httpHeader.status = BAD_REQUEST;
+    }
+    switch (httpHeader.status) {
+        case BAD_REQUEST:
+            printf("Bad request\n");
+            break;
+        case OK:
+            printf("OK\n");
+            break;
+        case NOT_FOUND:
+            printf("NOt found\n");
+            break;
+    }
+    switch (httpHeader.command) {
+        case UNKNOWN_C:
+            printf("UNKNOWS\n");
+            break;
+        case GET:
+            printf("GET\n");
+            break;
+        case HEAD:
+            printf("HEAD\n");
+            break;
+    }
+    printf("%s\n", path);
+    free(line);
+    if (httpHeader.status != BAD_REQUEST) {
+        char fullPath[2048] = {'\0'};
+        strcpy(fullPath, ROOT_PATH);
+        strcat(fullPath, path);
+        int fd = open(fullPath, O_RDONLY);
+        if (fd < 0) {
+            httpHeader.status = NOT_FOUND;
+            printf("Can't open %s", fullPath);
+        }
+        client->openedFd = -1;
+        struct stat st;
+        httpHeader.length = lseek(fd, 0, SEEK_END);
+        if (httpHeader.length == -1 || lseek(fd, 0, SEEK_SET) == -1) {
+            httpHeader.status = BAD_REQUEST;
+            printf("Cant seek\n");
+        }
+        addHeader(&httpHeader, client->output_buffer);
+        if (fstat(fd, &st) < 0) {
+            perror("fstat");
+        }
+        if (fd != -1 && httpHeader.status == OK && httpHeader.command == GET) {
+            evbuffer_set_flags(client->output_buffer, EVBUFFER_FLAG_DRAINS_TO_FD);
+            if(evbuffer_add_file(client->output_buffer, fd, 0, httpHeader.length) != 0) {
+                perror("add file");
+            }
+        }
+        if (bufferevent_write_buffer(bev, client->output_buffer)) {
+            printf("Error sending data to client on fd %d\n", client->fd);
+            closeAll(client);
+        }
     }
 }
+
 void buffered_on_write(struct bufferevent *bev, void *arg) {
+#ifdef DEBUG
     printf("On write\n");
     printf("exiting\n");
+#endif
     client_t *cl =(client_t*) arg;
     event_base_loopbreak(cl->evbase);
+    //closeAll(cl);
 }
 void on_accept(evutil_socket_t fd, short ev, void *arg) {
     int client_fd;
@@ -226,21 +432,19 @@ void on_accept(evutil_socket_t fd, short ev, void *arg) {
         return;
     }
 
-    /* Set the client socket to non-blocking
-     * mode. */
     if (evutil_make_socket_nonblocking(client_fd) < 0) {
         printf("failed to set client socket to non-blocking\n");
         close(client_fd);
         return;
     }
 
-    /* Create a client object. */
-    if ((client =(client_t*) malloc(sizeof(*client))) == NULL) {
+    /*if ((client =(client_t*) malloc(sizeof(*client))) == NULL) {
         printf("failed to allocate memory for client state\n");
         close(client_fd);
         return;
-    }
-    memset(client, 0, sizeof(*client));
+    }*/
+    client = new client_t();
+    //memset(client, 0, sizeof(*client));
     client->fd = client_fd;
 
     if ((client->output_buffer = evbuffer_new()) == NULL) {
@@ -259,42 +463,99 @@ void on_accept(evutil_socket_t fd, short ev, void *arg) {
     }
     bufferevent_setcb(client->buf_ev, buffered_on_read, buffered_on_write, NULL, client);
     bufferevent_enable(client->buf_ev, EV_READ);
-    m.lock();
-    q.push(client);
-    m.unlock();
+    client->openedFd = -1;
+    event_base_dispatch(client->evbase);
+    closeAll(client);
+    //lq.push(client);
+    //m.lock();
+    //aqq.push_back(client);
+    //m.unlock();
+    //lq.push(fd);
     //event_base_dispatch(client->evbase);
 
 }
 static void sighandler(int signal) {
     fprintf(stdout, "Received signal %d: %s.  Shutting down.\n", signal,
             strsignal(signal));
+    isRun = false;
     exit(1);
 }
 
 void threadF(){
-    std::cout << "Thread started\n" << std::endl;
+#ifdef DEBUG
+    std::cout << "Thread " << std::this_thread::get_id() << " started" << std::endl;
+#endif
     client_t *client;
     bool fl = false;
-    while(1) {
-        m.lock();
-        if(!q.empty()) {
-            client = q.front();
-            q.pop();
-            fl = true;
-        }
-        m.unlock();
-        if(fl) {
+    int fd;
+    while(isRun) {
+        //m.lock();
+       // client = aqq.pop_front();'
+        if(lq.pop(client)) {
+#ifdef DEBUG
             std::cout << "Poped element in " << std::this_thread::get_id() <<  std::endl;
+#endif
             event_base_dispatch(client->evbase);
-            printf("Exiting in loop\n");
+            closeAll(client);
         }
-        fl = false;
-        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        //m.unlock();
+    /*    if(lq.pop(fd)) {
+            int client_fd;
+            std::cout << fd << std::endl;
+            struct sockaddr_in client_addr;
+            socklen_t client_len = sizeof(client_addr);
+            client_t *client;
+
+            client_fd = accept(fd, (struct sockaddr *)&client_addr, &client_len);
+            if (client_fd < 0) {
+                warn("accept failed");
+                continue;
+            }
+
+            if (evutil_make_socket_nonblocking(client_fd) < 0) {
+                printf("failed to set client socket to non-blocking\n");
+                close(client_fd);
+                continue;
+            }
+
+            if ((client =(client_t*) malloc(sizeof(*client))) == NULL) {
+                printf("failed to allocate memory for client state\n");
+                close(client_fd);
+                continue;
+            }
+            memset(client, 0, sizeof(*client));
+            client->fd = client_fd;
+
+            if ((client->output_buffer = evbuffer_new()) == NULL) {
+                printf("client output buffer allocation failed\n");
+                continue;
+            }
+
+            if ((client->evbase = event_base_new()) == NULL) {
+                printf("client event_base creation failed\n");
+                continue;
+            }
+
+            client->buf_ev = bufferevent_socket_new(client->evbase, client_fd, BEV_OPT_CLOSE_ON_FREE);
+            if ((client->buf_ev) == NULL) {
+                continue;
+            }
+            bufferevent_setcb(client->buf_ev, buffered_on_read, buffered_on_write, NULL, client);
+            bufferevent_enable(client->buf_ev, EV_READ);
+            client->openedFd = -1;
+            event_base_dispatch(client->evbase);
+            std::cout << "FINISED" << std::endl;
+            closeAll(client);
+        }*/
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
+#ifdef DEBUG
+    std::cout << "Exiting from thread: " << std::this_thread::get_id() << std::endl;
+#endif
 }
 int main()
 {
-    evutil_socket_t listenfd;
+    /*evutil_socket_t listenfd;
     struct sockaddr_in listen_addr;
     struct event *ev_accept;
     int reuseaddr_on;
@@ -308,41 +569,68 @@ int main()
     sigaction(SIGINT, &siginfo, NULL);
     sigaction(SIGTERM, &siginfo, NULL);
 
-    /* Create our listening socket. */
     listenfd = socket(AF_INET, SOCK_STREAM, 0);
     if (listenfd < 0) {
         err(1, "listen failed");
-    }
+        }
 
-    memset(&listen_addr, 0, sizeof(listen_addr));
-    listen_addr.sin_family = AF_INET;
-    listen_addr.sin_addr.s_addr = INADDR_ANY;
-    listen_addr.sin_port = htons(SERVER_PORT);
-    if (bind(listenfd, (struct sockaddr *)&listen_addr, sizeof(listen_addr)) 
-            < 0) {
+        memset(&listen_addr, 0, sizeof(listen_addr));
+        listen_addr.sin_family = AF_INET;
+        listen_addr.sin_addr.s_addr = INADDR_ANY;
+        listen_addr.sin_port = htons(SERVER_PORT);
+        if (bind(listenfd, (struct sockaddr *)&listen_addr, sizeof(listen_addr)) 
+        < 0) {
         err(1, "bind failed");
-    }
-    if (listen(listenfd, 8) < 0) {
+        }
+        if (listen(listenfd, 8) < 0) {
         err(1, "listen failed");
-    }
-    reuseaddr_on = 1;
-    setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &reuseaddr_on,
-            sizeof(reuseaddr_on));
-    if (evutil_make_socket_nonblocking(listenfd) < 0) {
+        }
+        reuseaddr_on = 1;
+        setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &reuseaddr_on,
+        sizeof(reuseaddr_on));
+        if (evutil_make_socket_nonblocking(listenfd) < 0) {
         err(1, "failed to set server socket to non-blocking");
-    }
+        }
 
-    if ((evbase_accept = event_base_new()) == NULL) {
+        if ((evbase_accept = event_base_new()) == NULL) {
         perror("Unable to create socket accept event base");
         close(listenfd);
         return 1;
-    }
-    ev_accept = event_new(evbase_accept, listenfd, EV_READ|EV_PERSIST, on_accept, NULL);
-    event_add(ev_accept, NULL);
-    for(int i = 0;i < 4; i++) {
-        std::thread (threadF).detach();
+        }
+        ev_accept = event_new(evbase_accept, listenfd, EV_READ|EV_PERSIST, on_accept, NULL);
+        event_add(ev_accept, NULL);
+        for(int i = 0;i < 4; i++) {
+    //    std::thread (threadF).detach();
     }
     event_base_dispatch(evbase_accept);
+    */
+    struct event_base *base;
+    struct evconnlistener *listener;
+    struct sockaddr_in sin;
+
+    base = event_base_new();
+    if (!base) {
+        fprintf(stderr, "Could not initialize libevent!\n");
+        return 1;
+    }
+
+    memset(&sin, 0, sizeof(sin));
+    sin.sin_port = htons(5555);
+    sin.sin_family = AF_INET;
+
+    listener = evconnlistener_new_bind(base, listener_cb, (void *)base,
+            LEV_OPT_REUSEABLE|LEV_OPT_CLOSE_ON_FREE, -1,
+            (struct sockaddr*)&sin,
+            sizeof(sin));
+
+    if (!listener) {
+        fprintf(stderr, "Could not create a listener!\n");
+        return 1;
+    }
+
+    evconnlistener_set_error_cb(listener, accept_error_cb);
+
+    event_base_dispatch(base);
 
     event_base_free(evbase_accept);
     evbase_accept = NULL;
