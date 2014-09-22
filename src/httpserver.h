@@ -23,7 +23,7 @@
 #include <sys/stat.h>
 #define MAX_PATH_SIZE 1024
 #define MAX_OTHER_SIZE 256
-#define ROOT_PATH "/home/minaev/"
+#define ROOT_PATH "/home/mike/"
 typedef enum {
 	GET,
 	HEAD,
