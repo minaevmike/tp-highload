@@ -20,11 +20,10 @@
 #include <signal.h>
 #include <string.h>
 #include <ctype.h>
-#include <bsd/string.h>
 #include <sys/stat.h>
 #define MAX_PATH_SIZE 1024
 #define MAX_OTHER_SIZE 256
-#define ROOT_PATH "/home/mike/"
+#define ROOT_PATH "/home/minaev/"
 typedef enum {
 	GET,
 	HEAD,

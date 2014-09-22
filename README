@@ -1,0 +1,10 @@
+TP Highload http server
+For nice working on highload don't forget to change limit of open files:
+add to /etc/secutity/limits.conf
+* hard nofile 100000
+* soft nofile 100000
+and /etc/sysctl.conf
+fs.file-max = 100000
+and then sudo sysctl -p
+
+To apply changes for limits.conf you need to reboot.
