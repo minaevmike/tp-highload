@@ -1,45 +1,45 @@
 #include "httpserver.h"
-#include "ThreadPool.h"
 #include <thread>
 #include <iostream>
 #include <event2/thread.h>
+#include <boost/lockfree/queue.hpp>
 #define PORT 8080
-#define THREADS 4
+
 
 void listener_cb(struct evconnlistener *, evutil_socket_t, struct sockaddr *, int socklen, void *);
 void conn_writecb(struct bufferevent *, void *);
 void conn_readcb(struct bufferevent *, void *);
 void conn_eventcb(struct bufferevent *, short, void *);
 void accept_error_cb(struct evconnlistener *listener, void *ctx);
+static void theadFunc1();
+boost::lockfree::queue<int> q(1024);
 
-ThreadPool pool(16);
+void listener_cb_1(struct evconnlistener *listener, evutil_socket_t fd,
+        struct sockaddr *sa, int socklen, void *user_data)
+{
+	q.push(fd);
+}
 
-struct client {
-    int fd;
-    struct bufferevent *base;
-    ~client(){};
-    client (const client &cl) {
-        fd = cl.fd;
-        base = cl.base;
-    }
-    client &operator=(const client &other) {
-        if(this != &other) {
-            fd = other.fd;
-            base = other.base;
-        }
-        return *this;
-    }
-    client() {};
-};
-
+static void threadFunc1() {
+	event_base *base = event_base_new();
+	if (!base) {
+		perror("Base new");
+	}
+	int fd;
+	while(1) {
+		event_base_loop(base, EVLOOP_ONCE);
+		if(q.pop(fd)){
+			listener_cb(NULL, fd, NULL, 0, (void*)base);
+		}
+	}
+}
 volatile bool isRun = true;
 int main()
 {
-    evthread_use_pthreads();
     struct event_base *base;
     struct evconnlistener *listener;
     struct sockaddr_in sin;
-
+	int numThreads = 2 * std::thread::hardware_concurrency();
     base = event_base_new();
     if (!base) {
         fprintf(stderr, "Could not initialize libevent!\n");
@@ -50,11 +50,14 @@ int main()
     sin.sin_port = htons(PORT);
     sin.sin_family = AF_INET;
 
-    listener = evconnlistener_new_bind(base, listener_cb, (void *)base,
-        LEV_OPT_REUSEABLE|LEV_OPT_CLOSE_ON_FREE|LEV_OPT_THREADSAFE, -1,
+    listener = evconnlistener_new_bind(base, listener_cb_1, (void *)base,
+        LEV_OPT_REUSEABLE|LEV_OPT_CLOSE_ON_FREE, -1,
         (struct sockaddr*)&sin,
         sizeof(sin));
-
+	printf("Starting server on localhost:%d\nNumber of working threads: %d\n", PORT, numThreads);
+	for(int i = 0; i < numThreads; ++i) {
+		std::thread (threadFunc1).detach();
+	}
     if (!listener) {
         fprintf(stderr, "Could not create a listener!\n");
         return 1;
@@ -71,7 +74,7 @@ int main()
 
 void threadFunc(int fd, struct event_base *base) {
     struct bufferevent *bev;
-    bev = bufferevent_socket_new(base, fd, BEV_OPT_CLOSE_ON_FREE|BEV_OPT_THREADSAFE);
+    bev = bufferevent_socket_new(base, fd, BEV_OPT_CLOSE_ON_FREE);
     if (!bev) {
         fprintf(stderr, "Error constructing bufferevent!");
         event_base_loopbreak(base);
@@ -94,32 +97,19 @@ void accept_error_cb(struct evconnlistener *listener, void *ctx)
 void listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
         struct sockaddr *sa, int socklen, void *user_data)
 {
-    /*
-    struct event_base *base = (event_base*)user_data;
-    struct bufferevent *bev;
-    printf("FDD:%d\n", fd);
-    bev = bufferevent_socket_new(base, fd, BEV_OPT_CLOSE_ON_FREE|BEV_OPT_THREADSAFE);
-    if (!bev) {
-        fprintf(stderr, "Error constructing bufferevent!");
-        event_base_loopbreak(base);
-        return;
-    }
-    bufferevent_setcb(bev, NULL, NULL, conn_eventcb, NULL);
-    bufferevent_enable(bev, EV_READ);
-    */
-    //threadFunc(bev);
-    pool.enqueue(threadFunc, fd, (event_base*)user_data);
-    //pool.add_task(new Task(&threadFunc, (void *)bev));
-    //pool.runAsync(threadFunc, bev);
+	event_base *base = (event_base*)user_data;
+	bufferevent *bev = bufferevent_socket_new(base, fd, BEV_OPT_CLOSE_ON_FREE);
+	if(!bev) {
+		perror("Bev");
+	}
+	bufferevent_setcb(bev, conn_readcb, NULL, conn_eventcb, NULL);
+	if (bufferevent_enable(bev, EV_READ) == -1){
+		perror("Read");
+	}
 }
 
 void conn_readcb(struct bufferevent *pBufferEvent, void *user_data)
 {
-    /*client *cl = new client();
-    cl->fd = 1;
-    cl->base = pBufferEvent;
-    q.push(cl);*/
-    std::cout << std::this_thread::get_id() << std::endl;    
     writeData(pBufferEvent);
     bufferevent_setcb(pBufferEvent, NULL, conn_writecb, conn_eventcb, NULL);
     bufferevent_enable(pBufferEvent, EV_WRITE);

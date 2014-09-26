@@ -1,5 +1,5 @@
 DEBUG=-Wall -g -DDEBUG
-LDFLAGS=-levent -std=c++11 -g -levent_pthreads -lpthread
+LDFLAGS=-levent -std=c++11 -g -levent_pthreads -lpthread -lboost_system
 BINS=http
 CC=g++
 FILE=test.cc httpserver.cc 
